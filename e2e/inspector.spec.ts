@@ -229,6 +229,17 @@ test.describe("HTTP Inspector", () => {
     await expect(page.locator("#tab-body img")).toBeVisible();
   });
 
+  test("export JSON downloads the inspection result", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#url").fill(`${baseURL}/demo/200`);
+    await page.locator("#inspect-btn").click();
+    await expect(page.locator("#r-status")).toHaveText("200", { timeout: 20000 });
+    const download = page.waitForEvent("download");
+    await page.locator("#export-json").click();
+    const dl = await download;
+    expect(dl.suggestedFilename()).toContain(".json");
+  });
+
   test("redirect chain try-example runs the demo chain and shows its hops", async ({ page }) => {
     await page.goto("/");
     await page.locator('button[data-url$="/demo/redirect/3"]').click();
