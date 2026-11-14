@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HTTP Inspector, check status, headers, TLS, and timing</title>
+<meta name="description" content="Paste any URL to check its status, headers, TLS, and timing, and test webhooks without CORS blocking you. Free, no signup.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script>
+(function(){try{var t=localStorage.getItem("http-inspector-theme");if(!t){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){}})();
+</script>
+</head>
+<body>
+<header class="hero">
+  <div class="container">
+    <nav class="nav">
+      <a class="brand" href="/">http<span class="brand-dot">.</span>avenash-kumar.com</a>
+      <div class="nav-actions">
+        <div class="theme-toggle" role="group" aria-label="Theme">
+          <button type="button" id="theme-light" aria-pressed="true">Light</button>
+          <button type="button" id="theme-dark" aria-pressed="false">Dark</button>
+        </div>
+        <a class="btn btn-ghost" href="https://github.com/AvenashKumar">GitHub</a>
+      </div>
+    </nav>
+    <h1>Check any URL.<br>See what it really returns.</h1>
+    <p class="sub">Paste a URL to check its status, headers, timing, and redirects, from the server side, so CORS does not block you. No signup needed.</p>
+    <div class="trust"><span>✓ Real status and headers</span><span>✓ Real timing</span><span>✓ Webhook inbox</span></div>
+  </div>
+</header>
+
+<main class="container">
+  <section class="card inspector-card">
+    <div class="mode-tabs">
+      <button type="button" class="mode-tab active" id="mode-inspect">Inspect a URL</button>
+      <button type="button" class="mode-tab" id="mode-webhook">Webhook Inbox</button>
+    </div>
+
+    <div id="inspect-pane">
+      <form id="inspect-form">
+        <div class="request-bar">
+          <select id="method" aria-label="Method">
+            <option>GET</option><option>HEAD</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>OPTIONS</option>
+          </select>
+          <input id="url" type="url" placeholder="https://example.com/api/users" required>
+          <button class="btn btn-primary" type="submit" id="inspect-btn">Inspect</button>
+        </div>
+        <div class="examples">
+          <span>Try:</span>
+          <button type="button" data-url="https://api.github.com/repos/AvenashKumar/edge-url-shortener">GitHub API, 200</button>
+          <button type="button" data-url="https://www.avenash-kumar.com">avenash-kumar.com</button>
+          <button type="button" data-url="https://httpbin.org/redirect/3">Redirect chain</button>
+          <button type="button" data-url="https://httpbin.org/status/404">404</button>
+          <button type="button" data-url="https://expired.badssl.com/">Expired TLS</button>
+        </div>
+        <div class="options">
+          <label><input type="checkbox" id="follow" checked> Follow redirects</label>
+          <label>Timeout <select id="timeout"><option value="5000">5s</option><option value="10000" selected>10s</option><option value="30000">30s</option></select></label>
+          <label>Region <select id="region"><option>Auto, nearest edge</option></select></label>
+          <details class="advanced"><summary>Custom headers and body</summary>
+            <textarea id="headers" rows="3" placeholder="X-Api-Key: abc123&#10;Accept: application/json"></textarea>
+            <textarea id="body" rows="3" placeholder="Request body, for POST, PUT, or PATCH"></textarea>
+          </details>
+        </div>
+      </form>
+
+      <div id="result" class="result hidden">
+        <div class="scoreboard">
+          <div class="stat"><span>Status</span><strong id="r-status">, </strong><small id="r-status-text"></small></div>
+          <div class="stat"><span>Time to first byte</span><strong id="r-ttfb">, </strong></div>
+          <div class="stat"><span>Total</span><strong id="r-total">, </strong></div>
+          <div class="stat"><span>Size</span><strong id="r-size">, </strong></div>
+          <div class="stat"><span>Content type</span><strong id="r-type">, </strong></div>
+        </div>
+        <p id="r-verdict" class="verdict"></p>
+        <div class="waterfall" id="waterfall"></div>
+        <p class="timing-note">DNS, TCP, and TLS timing are not exposed by Workers fetch, so they are shown as not available, not simulated. Total, time to first byte, and download are real.</p>
+        <div class="tabs">
+          <button type="button" class="tab active" data-tab="headers">Headers</button>
+          <button type="button" class="tab" data-tab="body">Body</button>
+          <button type="button" class="tab" data-tab="tls">TLS</button>
+          <button type="button" class="tab" data-tab="redirects">Redirects</button>
+          <button type="button" class="tab" data-tab="cookies">Cookies</button>
+        </div>
+        <div class="tab-body" id="tab-headers"></div>
+        <div class="tab-body hidden" id="tab-body"></div>
+        <div class="tab-body hidden" id="tab-tls"></div>
+        <div class="tab-body hidden" id="tab-redirects"></div>
+        <div class="tab-body hidden" id="tab-cookies"></div>
+        <button class="btn btn-secondary" type="button" id="copy-curl">Copy as cURL</button>
+        <span id="copy-msg" class="copy-msg"></span>
+      </div>
+      <p id="inspect-error" class="error hidden"></p>
+    </div>
+
+    <div id="webhook-pane" class="hidden">
+      <p>Test webhooks without a public server. Create an inbox, point a service at the endpoint, and watch requests arrive.</p>
+      <button class="btn btn-primary" type="button" id="create-inbox">Create webhook inbox</button>
+      <div id="inbox" class="hidden">
+        <p>Your endpoint, valid for 24 hours:</p>
+        <code id="inbox-url"></code>
+        <button class="btn btn-secondary" type="button" id="copy-inbox">Copy endpoint</button>
+        <button class="btn btn-secondary" type="button" id="simulate-hook">Simulate a request</button>
+        <button class="btn btn-secondary" type="button" id="refresh-hook">Refresh</button>
+        <div id="hook-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Recent inspections</h2>
+    <p class="muted">Stored on the server, so you can come back to a result.</p>
+    <div id="history"></div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <p>Built by <a href="https://www.avenash-kumar.com">Avenash Kumar</a>. Also try the <a href="https://go.avenash-kumar.com">Edge URL Shortener</a>. Code is on <a href="https://github.com/AvenashKumar">GitHub</a>.</p>
+  </div>
+</footer>
+<script src="/app.js"></script>
+</body>
+</html>
