@@ -123,7 +123,17 @@ async function refreshHooks() {
   const r = await fetch(`/api/webhooks/${inboxId}/requests`);
   const d = await r.json();
   const list = d.requests || [];
-  $("hook-list").innerHTML = list.length ? list.map((x) => `<div class="history-row"><span><strong>${esc(x.method)}</strong> ${esc(x.path || "")} , ${esc(x.source || "")}</span><span>${new Date(x.received_at).toLocaleString()}</span></div><pre class="tab-body">${esc(x.body_text || "")}</pre>`).join("") : "<p class='muted'>No requests yet. Send one to the endpoint above.</p>";
+  $("hook-list").innerHTML = list.length ? `<div style="margin:10px 0"><button type="button" class="btn btn-secondary" id="hook-expand-all">Expand all</button> <button type="button" class="btn btn-secondary" id="hook-collapse-all">Collapse all</button></div>` + list.map((x) => {
+    let headers = [];
+    try { headers = JSON.parse(x.headers_json || "[]"); } catch (e) { headers = []; }
+    const headerText = headers.map((h) => `${h.name}: ${h.value}`).join("\n") || "No headers received.";
+    return `<details class="hook-item"><summary><strong>${esc(x.method)}</strong> ${esc(x.path || "")} , ${esc(x.source || "")} , ${new Date(x.received_at).toLocaleString()}</summary><p class="muted">Headers</p><pre class="tab-body">${esc(headerText)}</pre><p class="muted">Body</p><pre class="tab-body">${esc(x.body_text || "")}</pre></details>`;
+  }).join("") : "<p class='muted'>No requests yet. Send one to the endpoint above.</p>";
+  const expandAll = $("hook-expand-all");
+  if (expandAll) {
+    expandAll.addEventListener("click", () => document.querySelectorAll(".hook-item").forEach((d) => { d.open = true; }));
+    $("hook-collapse-all").addEventListener("click", () => document.querySelectorAll(".hook-item").forEach((d) => { d.open = false; }));
+  }
 }
 $("create-inbox").addEventListener("click", async () => {
   const r = await fetch("/api/webhooks", { method: "POST" });
