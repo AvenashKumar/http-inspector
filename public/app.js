@@ -35,14 +35,31 @@ async function loadHistory() {
     const d = await r.json();
     const list = d.inspections || [];
     $("history").innerHTML = list.length ? list.map((x) => `
-      <div class="history-row">
-        <span><strong>${x.status || "error"}</strong> ${esc(x.method)} ${esc(x.url)}</span>
-        <span>${new Date(x.created_at).toLocaleString()} , ${fmtMs(x.total_ms)}</span>
-        <button type="button" data-url="${esc(x.url)}" data-method="${esc(x.method)}">Inspect again</button>
-      </div>`).join("") : "<p class='muted'>No inspections yet.</p>";
-    $("history").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      <details class="hook-item history-item" data-id="${esc(x.id)}">
+        <summary><strong>${x.status || "error"}</strong> ${esc(x.method)} ${esc(x.url)} , ${new Date(x.created_at).toLocaleString()} , ${fmtMs(x.total_ms)}</summary>
+        <div class="history-detail"><p class="muted">Loading details...</p></div>
+        <button type="button" class="btn btn-secondary inspect-again" data-url="${esc(x.url)}" data-method="${esc(x.method)}">Inspect again</button>
+      </details>`).join("") : "<p class='muted'>No inspections yet.</p>";
+    $("history").querySelectorAll(".inspect-again").forEach((b) => b.addEventListener("click", (e) => {
+      e.preventDefault();
       $("url").value = b.dataset.url; $("method").value = b.dataset.method;
       $("inspect-form").requestSubmit();
+    }));
+    $("history").querySelectorAll(".history-item").forEach((el) => el.addEventListener("toggle", async () => {
+      if (!el.open || el.dataset.loaded) return;
+      el.dataset.loaded = "1";
+      const detail = el.querySelector(".history-detail");
+      try {
+        const res = await fetch(`/api/inspect/${el.dataset.id}`);
+        const full = await res.json();
+        if (!res.ok) { detail.innerHTML = "<p class='muted'>Details could not be loaded.</p>"; return; }
+        let headers = [];
+        try { headers = JSON.parse(full.headers_json || "[]"); } catch (e) { headers = []; }
+        const headerText = headers.map((h) => `${h.name}: ${h.value}`).join("\n") || "No headers returned.";
+        let redirects = [];
+        try { redirects = JSON.parse(full.redirects_json || "[]"); } catch (e) { redirects = []; }
+        detail.innerHTML = `<p><strong>Status:</strong> ${full.status || "error"} ${esc(full.status_text || "")} , <strong>TTFB:</strong> ${fmtMs(full.ttfb_ms)} , <strong>Total:</strong> ${fmtMs(full.total_ms)} , <strong>Size:</strong> ${fmtBytes(full.size_bytes)} , <strong>Content type:</strong> ${esc(full.content_type || "n/a")}</p><p class="muted">Redirects</p><pre class="tab-body">${esc(redirects.length ? redirects.map((x) => `${x.status} -> ${x.location} (${x.ms} ms)`).join("\n") : "No redirects followed.")}</pre><p class="muted">Headers</p><pre class="tab-body">${esc(headerText)}</pre><p class="muted">Body</p><pre class="tab-body">${esc(full.body_text || full.error || "Empty body.")}</pre>`;
+      } catch (e) { detail.innerHTML = "<p class='muted'>Details could not be loaded.</p>"; }
     }));
   } catch (e) { $("history").innerHTML = "<p class='muted'>History could not be loaded.</p>"; }
 }
