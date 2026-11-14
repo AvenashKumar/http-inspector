@@ -55,6 +55,7 @@
           <button type="button" data-url="https://httpbin.org/redirect/3">Redirect chain</button>
           <button type="button" data-url="https://httpbin.org/status/404">404</button>
           <button type="button" data-url="https://expired.badssl.com/">Expired TLS</button>
+          <button type="button" data-url="https://picsum.photos/seed/inspector/600/300">Image, JPEG</button>
         </div>
         <div class="options">
           <label><input type="checkbox" id="follow" checked> Follow redirects</label>
@@ -99,10 +100,23 @@
     <div id="webhook-pane" class="hidden">
       <p>Test webhooks without a public server. Create an inbox, point a service at the endpoint, and watch requests arrive.</p>
       <button class="btn btn-primary" type="button" id="create-inbox">Create webhook inbox</button>
+      <div id="my-inboxes">
+        <h3>My inboxes</h3>
+        <p class="muted">Inboxes you created in this browser, saved here so you can reopen them after closing the browser. The messages themselves live on the server for 24 hours.</p>
+        <div id="inbox-list"></div>
+        <p>Open an inbox by ID or endpoint:</p>
+        <div class="request-bar">
+          <input id="open-inbox-id" type="text" placeholder="8eb6c1b8 or https://http.avenash-kumar.com/hook/8eb6c1b8">
+          <button class="btn btn-secondary" type="button" id="open-inbox">Open inbox</button>
+        </div>
+        <p id="open-inbox-error" class="error hidden"></p>
+      </div>
       <div id="inbox" class="hidden">
         <p>Your endpoint, valid for 24 hours:</p>
         <code id="inbox-url"></code>
+        <p id="inbox-meta" class="muted"></p>
         <button class="btn btn-secondary" type="button" id="copy-inbox">Copy endpoint</button>
+        <button class="btn btn-secondary" type="button" id="copy-inbox-link">Copy reopen link</button>
         <button class="btn btn-secondary" type="button" id="simulate-hook">Simulate a request</button>
         <button class="btn btn-secondary" type="button" id="refresh-hook">Refresh</button>
         <div id="hook-list"></div>
@@ -110,9 +124,10 @@
     </div>
   </section>
 
-  <section class="card">
+  <section class="card" id="history-section">
     <h2>Recent inspections</h2>
-    <p class="muted">Stored on the server, so you can come back to a result.</p>
+    <p class="muted">Stored only in your browser, in localStorage, last 50. Nothing is kept on the server. Webhook inboxes are different: they must receive requests while your browser is closed, so those stay on the server.</p>
+    <button class="btn btn-secondary" type="button" id="clear-history">Clear history</button>
     <div id="history"></div>
   </section>
 </main>
