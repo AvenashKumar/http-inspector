@@ -1,0 +1,23 @@
+# HTTP Inspector, live at http.avenash-kumar.com
+# Replace database_id after running: npx wrangler d1 create http-inspector
+name = "http-inspector"
+main = "src/index.ts"
+compatibility_date = "2024-06-20"
+compatibility_flags = ["nodejs_compat"]
+
+routes = [
+  { pattern = "http.avenash-kumar.com", custom_domain = true }
+]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "http-inspector"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[vars]
+BASE_URL = "https://http.avenash-kumar.com"
