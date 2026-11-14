@@ -92,6 +92,15 @@ async function handleDemo(request: Request, url: URL): Promise<Response> {
   return json({ error: "Unknown demo. Try /demo/200, /demo/redirect/3, /demo/404, /demo/headers, /demo/slow, or /demo/image." }, 404);
 }
 
+async function fetchTarget(target: URL, env: Env, init: RequestInit): Promise<Response> {
+  let ownHost = "";
+  try { ownHost = new URL(env.BASE_URL).hostname; } catch { ownHost = ""; }
+  if (ownHost && target.hostname === ownHost && target.pathname.startsWith("/demo/")) {
+    return handleDemo(new Request(target.toString(), { method: init.method || "GET", headers: init.headers }), target);
+  }
+  return fetch(target.toString(), init);
+}
+
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
   const parts = url.pathname.split("/").filter(Boolean);
 
@@ -133,7 +142,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       const t0 = Date.now();
       try {
-        response = await fetch(current.toString(), {
+        response = await fetchTarget(current, env, {
           method,
           headers: { ...customHeaders, "user-agent": "http-inspector/0.1 (+https://http.avenash-kumar.com)" },
           body: method === "GET" || method === "HEAD" ? undefined : (typeof body.body === "string" ? body.body : undefined),
