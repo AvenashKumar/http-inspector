@@ -24,6 +24,17 @@ function isPrivateHost(host: string): boolean {
   return false;
 }
 
+function mediaTypeFor(contentType: string | null): "image" | "audio" | "video" | "pdf" | "binary" | "text" {
+  const ct = (contentType || "").toLowerCase();
+  if (ct.startsWith("image/")) return "image";
+  if (ct.startsWith("audio/")) return "audio";
+  if (ct.startsWith("video/")) return "video";
+  if (ct.includes("application/pdf")) return "pdf";
+  if (ct.startsWith("text/") || ct.includes("json") || ct.includes("xml") || ct.includes("javascript") || ct.includes("application/x-www-form-urlencoded")) return "text";
+  if (!ct) return "text";
+  return "binary";
+}
+
 function headersToArray(h: Headers): { name: string; value: string }[] {
   const out: { name: string; value: string }[] = [];
   h.forEach((value, name) => out.push({ name, value }));
@@ -125,52 +136,54 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
 
     const totalMs = Date.now() - started;
     if (!response) {
-      const row = { id, method, url: target.toString(), status: null, statusText: null, createdAt: started, totalMs, ttfbMs, sizeBytes: 0, contentType: null, headers: [], body: "", redirects, error };
-      await env.DB.prepare(
-        "INSERT INTO inspections (id, method, url, status, status_text, created_at, total_ms, ttfb_ms, size_bytes, content_type, headers_json, body_text, redirects_json, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-      ).bind(id, method, target.toString(), null, null, started, totalMs, ttfbMs, 0, null, "[]", "", JSON.stringify(redirects), error).run();
+      const row = { id, method, url: target.toString(), status: null, statusText: null, createdAt: started, totalMs, ttfbMs, sizeBytes: 0, contentType: null, mediaType: "text" as const, previewUrl: target.toString(), headers: [], body: "", redirects, error };
       return json({ ...row, timing: { totalMs, ttfbMs, downloadMs: 0, dnsMs: null, tcpMs: null, tlsMs: null, note: "Workers fetch does not expose DNS, TCP, or TLS timing, so those are shown as not available, not simulated." }, tls: { available: false, note: "Workers fetch does not expose the TLS version or cipher for the outgoing connection." } });
     }
 
-    const text = await response.text();
-    const truncated = text.length > MAX_BODY;
-    const bodyText = truncated ? text.slice(0, MAX_BODY) : text;
-    const downloadMs = Math.max(0, totalMs - (ttfbMs || 0));
+    const buf = await response.arrayBuffer();
     const headers = headersToArray(response.headers);
     const contentType = response.headers.get("content-type");
+    const mediaType = mediaTypeFor(contentType);
     const cookies = headers.filter((h) => h.name.toLowerCase() === "set-cookie").map((h) => h.value);
-
-    await env.DB.prepare(
-      "INSERT INTO inspections (id, method, url, status, status_text, created_at, total_ms, ttfb_ms, size_bytes, content_type, headers_json, body_text, redirects_json, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).bind(id, method, target.toString(), response.status, response.statusText, started, totalMs, ttfbMs, new TextEncoder().encode(text).length, contentType, JSON.stringify(headers), bodyText, JSON.stringify(redirects), null).run();
+    const downloadMs = Math.max(0, totalMs - (ttfbMs || 0));
+    // Binary bodies (images, audio, video, PDFs, archives) are never decoded
+    // to text, so the UI never shows garbled bytes. The frontend renders a
+    // preview from the original URL instead. History is stored in the
+    // visitor's browser localStorage, not in D1, so nothing is inserted here.
+    let bodyText = "";
+    let truncated = false;
+    if (mediaType === "text") {
+      const text = new TextDecoder().decode(buf);
+      truncated = text.length > MAX_BODY;
+      bodyText = truncated ? text.slice(0, MAX_BODY) : text;
+    }
 
     return json({
       id, method, url: target.toString(), status: response.status, statusText: response.statusText,
-      createdAt: started, totalMs, ttfbMs, sizeBytes: new TextEncoder().encode(text).length,
-      contentType, headers, body: bodyText, truncated, redirects, cookies,
+      createdAt: started, totalMs, ttfbMs, sizeBytes: buf.byteLength,
+      contentType, mediaType, previewUrl: target.toString(), headers, body: bodyText, truncated, redirects, cookies,
       timing: { totalMs, ttfbMs, downloadMs, dnsMs: null, tcpMs: null, tlsMs: null, note: "Workers fetch does not expose DNS, TCP, or TLS timing, so those are shown as not available, not simulated." },
       tls: { available: false, note: "Workers fetch does not expose the TLS version or cipher for the outgoing connection." },
       verdict: response.status >= 200 && response.status < 300 ? "OK. The URL responded successfully." : response.status >= 300 && response.status < 400 ? "Redirect. Follow the location header to reach the final URL." : response.status >= 400 && response.status < 500 ? "Client error. Check the URL, method, headers, and auth." : "Server error. The target server returned an error status.",
     });
   }
 
-  if (parts[1] === "history" && request.method === "GET") {
-    const rows = await env.DB.prepare("SELECT id, method, url, status, status_text, created_at, total_ms FROM inspections ORDER BY created_at DESC LIMIT 50").all();
-    return json({ inspections: rows.results || [] });
-  }
+  // Inspection history is stored in the visitor's browser localStorage, not
+  // in D1. D1 is only used for webhook inboxes, which must receive requests
+  // from other servers while the visitor's browser is closed.
 
-  if (parts[1] === "inspect" && request.method === "GET" && parts.length === 3) {
-    const row = await env.DB.prepare("SELECT * FROM inspections WHERE id = ?").bind(parts[2]).first();
-    if (!row) return json({ error: "Inspection not found" }, 404);
-    return json(row);
-  }
-
-  if (parts[1] === "webhooks" && request.method === "POST") {
+  if (parts[1] === "webhooks" && parts.length === 2 && request.method === "POST") {
     const id = crypto.randomUUID().slice(0, 8);
     const now = Date.now();
     await env.DB.prepare("INSERT INTO webhooks (id, created_at, expires_at) VALUES (?, ?, ?)").bind(id, now, now + 24 * 60 * 60 * 1000).run();
     const base = env.BASE_URL.replace(/\/$/, "");
     return json({ id, endpoint: `${base}/hook/${id}`, expiresAt: now + 24 * 60 * 60 * 1000 }, 201);
+  }
+
+  if (parts[1] === "webhooks" && parts.length === 3 && request.method === "GET") {
+    const hook = await env.DB.prepare("SELECT * FROM webhooks WHERE id = ?").bind(parts[2]).first();
+    if (!hook) return json({ error: "Webhook inbox not found" }, 404);
+    return json({ id: hook.id as string, createdAt: hook.created_at as number, expiresAt: hook.expires_at as number });
   }
 
   if (parts[1] === "webhooks" && parts.length === 4 && parts[3] === "requests" && request.method === "GET") {
