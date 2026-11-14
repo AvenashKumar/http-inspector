@@ -131,6 +131,17 @@ $("copy-curl").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(cmd); $("copy-msg").textContent = "Copied."; } catch (e) { $("copy-msg").textContent = cmd; }
 });
 
+$("export-json").addEventListener("click", () => {
+  if (!lastResult) return;
+  const blob = new Blob([JSON.stringify(lastResult, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `http-inspector-${lastResult.status || "result"}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  $("copy-msg").textContent = "Downloaded.";
+});
+
 $("mode-inspect").addEventListener("click", () => {
   $("mode-inspect").classList.add("active"); $("mode-webhook").classList.remove("active");
   $("inspect-pane").classList.remove("hidden"); $("webhook-pane").classList.add("hidden");
