@@ -10,6 +10,7 @@ Check status, headers, timing, and redirects for any URL, from the server side, 
 - Cookies from set-cookie headers, and copy as cURL
 - Recent inspection history, stored only in the visitor's browser localStorage (last 50)
 - Webhook inbox with a temporary endpoint, live capture, and a simulate button
+- Built-in demo pages for the try-examples, hosted by the Worker itself so they never depend on a third party site: /demo/200, /demo/redirect/3, /demo/404, /demo/headers, /demo/slow?ms=2000, /demo/image
 - Light and dark mode, with a toggle that remembers your choice
 
 ## Honest limits
