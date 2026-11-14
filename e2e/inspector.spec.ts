@@ -82,13 +82,30 @@ test.describe("HTTP Inspector", () => {
 
   test("@api-new image inspect returns a media type and no binary body", async () => {
     const ctx = await api();
-    const res = await inspect(ctx, { method: "GET", url: "https://picsum.photos/seed/inspector/600/300", followRedirects: true, timeoutMs: 15000 });
+    const res = await inspect(ctx, { method: "GET", url: `${baseURL}/demo/image`, followRedirects: true, timeoutMs: 15000 });
     expect(res.status(), await res.text()).toBe(200);
     const data = await res.json();
     expect(data.status).toBe(200);
     expect(data.mediaType).toBe("image");
     expect(data.body).toBe("");
-    expect(data.previewUrl).toContain("picsum.photos");
+    expect(data.previewUrl).toContain("/demo/image");
+    await ctx.dispose();
+  });
+
+  test("@api-new demo pages return the exact scenario they promise", async () => {
+    const ctx = await api();
+    const ok = await inspect(ctx, { method: "GET", url: `${baseURL}/demo/200`, followRedirects: true, timeoutMs: 10000 });
+    expect((await ok.json()).status).toBe(200);
+    const missing = await inspect(ctx, { method: "GET", url: `${baseURL}/demo/404`, followRedirects: true, timeoutMs: 10000 });
+    expect((await missing.json()).status).toBe(404);
+    const headers = await inspect(ctx, { method: "GET", url: `${baseURL}/demo/headers`, followRedirects: true, timeoutMs: 10000 });
+    const headersData = await headers.json();
+    expect(headersData.status).toBe(200);
+    expect(headersData.body).toContain("http-inspector");
+    const chain = await inspect(ctx, { method: "GET", url: `${baseURL}/demo/redirect/3`, followRedirects: true, timeoutMs: 10000 });
+    const chainData = await chain.json();
+    expect(chainData.status).toBe(200);
+    expect(chainData.redirects.length).toBe(3);
     await ctx.dispose();
   });
 
@@ -205,11 +222,20 @@ test.describe("HTTP Inspector", () => {
 
   test("image URL shows a preview, not binary garbage", async ({ page }) => {
     await page.goto("/");
-    await page.locator("#url").fill("https://picsum.photos/seed/inspector/600/300");
+    await page.locator("#url").fill(`${baseURL}/demo/image`);
     await page.locator("#inspect-btn").click();
     await expect(page.locator("#r-status")).toHaveText("200", { timeout: 20000 });
     await page.locator(".tab[data-tab='body']").click();
     await expect(page.locator("#tab-body img")).toBeVisible();
+  });
+
+  test("redirect chain try-example runs the demo chain and shows its hops", async ({ page }) => {
+    await page.goto("/");
+    await page.locator('button[data-url$="/demo/redirect/3"]').click();
+    await expect(page.locator("#url")).toHaveValue(/\/demo\/redirect\/3$/);
+    await expect(page.locator("#r-status")).toHaveText("200", { timeout: 20000 });
+    await page.locator(".tab[data-tab='redirects']").click();
+    await expect(page.locator("#tab-redirects")).toContainText("/demo/redirect/2");
   });
 
   test("recent inspections are expandable", async ({ page }) => {
