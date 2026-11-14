@@ -8,7 +8,7 @@ Check status, headers, timing, and redirects for any URL, from the server side, 
 - Real status, headers, body, size, total time, and time to first byte, measured by the Worker
 - Redirect chain, up to 5 redirects, with status and location for each hop
 - Cookies from set-cookie headers, and copy as cURL
-- Recent inspection history, stored in D1
+- Recent inspection history, stored only in the visitor's browser localStorage (last 50)
 - Webhook inbox with a temporary endpoint, live capture, and a simulate button
 - Light and dark mode, with a toggle that remembers your choice
 
@@ -52,14 +52,27 @@ Do not paste tokens or account IDs in chat. Add them only in GitHub Secrets.
 
 ## API
 
-- `POST /api/inspect` with `{ method, url, headers, body, followRedirects, timeoutMs }`
-- `GET /api/history`
-- `GET /api/inspect/:id`
+- `POST /api/inspect` with `{ method, url, headers, body, followRedirects, timeoutMs }`. The response includes `mediaType` (`text`, `image`, `audio`, `video`, `pdf`, or `binary`) and `previewUrl`. Binary bodies are never returned as text, so image, audio, video, and PDF results render as a preview in the UI instead of garbled bytes.
+- Inspection history is stored in the visitor's browser localStorage (last 50), not in D1. D1 is only used for webhook inboxes, which must receive requests from other servers while the visitor's browser is closed.
 - `POST /api/webhooks`, creates an inbox and returns its endpoint
+- `GET /api/webhooks/:id`, returns the inbox with its created and expiry times, or 404
 - `GET /api/webhooks/:id/requests`
 - `POST /api/webhooks/:id/simulate`
 - `POST /hook/:id`, any method, records the request and returns 200
+- Webhook inboxes are reopenable: every inbox created in the browser is saved in localStorage under `http-inspector-inboxes` (last 20) and shown in a My inboxes list, and any inbox can be reopened from a link like `/?inbox=<id>` or by pasting its ID or endpoint into the Open inbox box. Messages live on the server for 24 hours.
 
 ## Design
 
 The UI uses an improvised palette inspired by a clean premium style, not a copy of any other brand. Hero: deep midnight #0B1526 to indigo #3730A3. Primary: electric indigo #4F46E5. Accent: teal #2DD4BF. Headings: ink #0F172A. Font: Manrope. Light and dark mode are both included.
+
+## E2E tests
+
+Playwright tests in `e2e/` run against the live site by default (`https://http.avenash-kumar.com`, override with `E2E_BASE_URL`):
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+They cover health, homepage and theme toggle, a real inspect of example.com, a 404 inspect, rejected and private URLs, the UI result and history, expandable history rows, an image preview instead of binary text, and the webhook inbox with expandable headers. The `E2E tests` workflow in `.github/workflows/e2e.yml` runs them on every push to main and on pull requests.
