@@ -48,6 +48,8 @@ export default {
 
     if (path === "/health") return json({ ok: true });
 
+    if (path.startsWith("/demo/")) return handleDemo(request, url);
+
     if (path.startsWith("/hook/")) {
       const id = path.slice(6).split("/")[0];
       return handleHook(request, env, id);
@@ -59,6 +61,36 @@ export default {
     return env.ASSETS.fetch(request);
   },
 };
+
+async function handleDemo(request: Request, url: URL): Promise<Response> {
+  const parts = url.pathname.split("/").filter(Boolean);
+  const name = parts[1] || "";
+
+  if (name === "200") {
+    return json({ demo: "ok", status: 200, message: "This is a demo 200 response from the HTTP Inspector itself." });
+  }
+  if (name === "404") {
+    return json({ demo: "not-found", status: 404, message: "This is a demo 404 response from the HTTP Inspector itself." }, 404);
+  }
+  if (name === "headers") {
+    return json({ demo: "headers", method: request.method, url: url.toString(), headers: headersToArray(request.headers) });
+  }
+  if (name === "slow") {
+    const ms = Math.min(5000, Math.max(100, Number(url.searchParams.get("ms") || "2000")));
+    await new Promise((r) => setTimeout(r, ms));
+    return json({ demo: "slow", waitedMs: ms, message: `Waited ${ms} ms before responding.` });
+  }
+  if (name === "image") {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><rect width="600" height="300" fill="#0B1526"/><rect x="40" y="40" width="520" height="220" rx="16" fill="#4F46E5"/><text x="300" y="165" font-family="sans-serif" font-size="42" font-weight="bold" fill="#ffffff" text-anchor="middle">HTTP Inspector demo</text></svg>`;
+    return new Response(svg, { headers: { "content-type": "image/svg+xml" } });
+  }
+  if (name === "redirect") {
+    const n = Math.min(5, Math.max(0, Number(parts[2] || "0")));
+    if (n <= 0) return json({ demo: "redirect", status: 200, message: "End of the demo redirect chain." });
+    return new Response(null, { status: 302, headers: { location: `/demo/redirect/${n - 1}` } });
+  }
+  return json({ error: "Unknown demo. Try /demo/200, /demo/redirect/3, /demo/404, /demo/headers, /demo/slow, or /demo/image." }, 404);
+}
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
   const parts = url.pathname.split("/").filter(Boolean);
