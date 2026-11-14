@@ -1,1 +1,22 @@
-{"description":"HTTP Inspector, check status, headers, TLS, and timing for any URL, plus a webhook inbox. Runs on Cloudflare Workers and D1, live at http.avenash-kumar.com","devDependencies":{"@cloudflare/workers-types":"^4.20240620.0","typescript":"^5.5.0","wrangler":"^3.72.0"},"name":"http-inspector","private":true,"scripts":{"db:create":"wrangler d1 create http-inspector","db:migrate:local":"wrangler d1 migrations apply http-inspector --local","db:migrate:remote":"wrangler d1 migrations apply http-inspector --remote","deploy":"wrangler deploy","dev":"wrangler dev","typecheck":"tsc --noEmit"},"type":"module","version":"0.1.0"}
+{
+  "description": "HTTP Inspector, check status, headers, TLS, and timing for any URL, plus a webhook inbox. Runs on Cloudflare Workers and D1, live at http.avenash-kumar.com",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240620.0",
+    "typescript": "^5.5.0",
+    "wrangler": "^3.72.0",
+    "@playwright/test": "^1.49.0"
+  },
+  "name": "http-inspector",
+  "private": true,
+  "scripts": {
+    "db:create": "wrangler d1 create http-inspector",
+    "db:migrate:local": "wrangler d1 migrations apply http-inspector --local",
+    "db:migrate:remote": "wrangler d1 migrations apply http-inspector --remote",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test"
+  },
+  "type": "module",
+  "version": "0.1.0"
+}
