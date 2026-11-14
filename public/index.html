@@ -91,8 +91,16 @@
         <div class="tab-body hidden" id="tab-tls"></div>
         <div class="tab-body hidden" id="tab-redirects"></div>
         <div class="tab-body hidden" id="tab-cookies"></div>
-        <button class="btn btn-secondary" type="button" id="copy-curl">Copy as cURL</button>
-        <span id="copy-msg" class="copy-msg"></span>
+        <div class="share-panel">
+          <h3>Share and reproduce</h3>
+          <button class="btn btn-secondary" type="button" id="copy-curl">Copy as cURL</button>
+          <button class="btn btn-secondary" type="button" id="export-json">Export JSON</button>
+          <span id="copy-msg" class="copy-msg"></span>
+        </div>
+        <div class="why-panel">
+          <h3>Why a Worker?</h3>
+          <p class="muted">The fetch runs on Cloudflare Workers, not in your browser, so CORS never blocks it and the timing you see is measured server side. Workers fetch does not expose DNS, TCP, or TLS timing, so those are shown as not available, not simulated. The built-in demo pages are served by this same Worker, so the try-examples always work.</p>
+        </div>
       </div>
       <p id="inspect-error" class="error hidden"></p>
     </div>
